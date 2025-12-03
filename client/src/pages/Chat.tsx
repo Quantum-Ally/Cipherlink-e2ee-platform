@@ -372,17 +372,30 @@ const ChatContent = ({ user, onLogout }: { user: any; onLogout: () => void }) =>
 
   const establishSession = async (recipientId: string, recipientPublicKey: string) => {
     try {
-      const password = prompt('Enter your password to access private key:')
+      let password = prompt('Enter your password to access private key:')
       if (!password) {
         console.log('[KEY EXCHANGE] User cancelled password prompt')
         return null
       }
 
       console.log('[KEY EXCHANGE] Retrieving private key for user:', user.id)
-      const privateKey = await getPrivateKey(user.id, password)
+      let privateKey = await getPrivateKey(user.id, password)
+      
+      // If password is wrong, give 2 more attempts
+      let attempts = 0
+      while (!privateKey && attempts < 2) {
+        attempts++
+        password = prompt(`Incorrect password. Try again (${attempts}/2):`)
+        if (!password) {
+          console.log('[KEY EXCHANGE] User cancelled password prompt')
+          return null
+        }
+        privateKey = await getPrivateKey(user.id, password)
+      }
+      
       if (!privateKey) {
-        console.error('[KEY EXCHANGE] Failed to retrieve private key')
-        alert('Failed to retrieve private key. Make sure you entered the correct password.')
+        console.error('[KEY EXCHANGE] Failed to retrieve private key after 3 attempts')
+        alert('Failed to retrieve private key. Password incorrect.\n\nIMPORTANT: Private keys are stored locally during registration.\nIf you logged in from a different browser/device, you need to use the original browser where you registered, or register a new account.')
         return null
       }
 
@@ -849,7 +862,11 @@ const ChatContent = ({ user, onLogout }: { user: any; onLogout: () => void }) =>
   }
 
   const handleSendMessage = async () => {
-    if (!message.trim() || !currentChat) return
+    console.log('[SEND] handleSendMessage called', { message: message.trim(), currentChat, loading })
+    if (!message.trim() || !currentChat) {
+      console.log('[SEND] Blocked: empty message or no chat selected')
+      return
+    }
 
     setLoading(true)
     try {
@@ -1001,7 +1018,7 @@ const ChatContent = ({ user, onLogout }: { user: any; onLogout: () => void }) =>
                 <p className="ml-1">Chats</p>
                 <div className="flex justify-end w-full">
                   <DropdownMenu>
-                    <DropdownMenuTrigger>
+                    <DropdownMenuTrigger asChild>
                       <Button variant="ghost" size="icon">
                         <Plus />
                       </Button>
@@ -1108,7 +1125,7 @@ const ChatContent = ({ user, onLogout }: { user: any; onLogout: () => void }) =>
 
               <div className="flex h-12 px-3 py-2 border-t items-center gap-2">
                 <DropdownMenu>
-                  <DropdownMenuTrigger>
+                  <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon">
                       <Paperclip />
                     </Button>

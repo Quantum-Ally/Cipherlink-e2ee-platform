@@ -50,15 +50,26 @@ const Register = () => {
     setLoading(true)
 
     try {
+      console.log('[REGISTER] Starting registration process...')
       const { keyPair, publicKeyBase64 } = await generateKeyPair()
+      console.log('[REGISTER] Key pair generated, registering with server...')
       await register(username, password, publicKeyBase64)
+      console.log('[REGISTER] Server registration successful')
       const user = JSON.parse(localStorage.getItem('user') || '{}')
+      console.log('[REGISTER] User from localStorage:', user)
       if (user.id) {
+        console.log('[REGISTER] Storing private key for user:', user.id)
         await storePrivateKey(user.id, keyPair.privateKey, password)
+        console.log('[REGISTER] Private key stored successfully')
+      } else {
+        console.error('[REGISTER] No user.id found in localStorage!')
       }
+      console.log('[REGISTER] Navigating to chat...')
       navigate('/chat')
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Registration failed')
+      console.error('[REGISTER] Registration failed:', err)
+      console.error('[REGISTER] Error response:', err.response)
+      setError(err.response?.data?.error || err.message || 'Registration failed')
     } finally {
       setLoading(false)
     }

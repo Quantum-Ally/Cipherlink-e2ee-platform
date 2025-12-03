@@ -107,6 +107,7 @@ export async function getPrivateKey(
   password: string
 ): Promise<CryptoKey | null> {
   try {
+    console.log('[KEY STORAGE] Attempting to retrieve private key for:', userId)
     const db = await openDB()
     const stored = await new Promise<StoredKey | undefined>((resolve, reject) => {
       const transaction = db.transaction([STORE_NAME], 'readonly')
@@ -117,8 +118,12 @@ export async function getPrivateKey(
       request.onerror = () => reject(request.error)
     })
 
-    if (!stored) return null
+    if (!stored) {
+      console.error('[KEY STORAGE] No key found in IndexedDB for userId:', userId)
+      return null
+    }
 
+    console.log('[KEY STORAGE] Key found in IndexedDB, attempting decryption...')
     const salt = Uint8Array.from(atob(stored.salt), c => c.charCodeAt(0))
     const derivedKey = await deriveKeyFromPassword(password, salt)
 
@@ -126,6 +131,7 @@ export async function getPrivateKey(
     const iv = combined.slice(0, 12)
     const encrypted = combined.slice(12)
 
+    console.log('[KEY STORAGE] Attempting to decrypt with provided password...')
     const decrypted = await crypto.subtle.decrypt(
       {
         name: 'AES-GCM',
@@ -135,10 +141,11 @@ export async function getPrivateKey(
       encrypted
     )
 
+    console.log('[KEY STORAGE] Decryption successful')
     const keyData = new Uint8Array(decrypted)
     
     try {
-      return await crypto.subtle.importKey(
+      const key = await crypto.subtle.importKey(
         'pkcs8',
         keyData,
         {
@@ -148,6 +155,8 @@ export async function getPrivateKey(
         false,
         ['sign']
       )
+      console.log('[KEY STORAGE] Successfully imported RSA-PSS key')
+      return key
     } catch (pssError) {
       console.warn('Failed to import as RSA-PSS, trying RSA-OAEP (old format):', pssError)
       try {
@@ -168,8 +177,12 @@ export async function getPrivateKey(
         throw oaepError
       }
     }
-  } catch (error) {
-    console.error('Failed to retrieve private key:', error)
+  } catch (error: any) {
+    if (error.name === 'OperationError' && error.message.includes('operation failed')) {
+      console.error('[KEY STORAGE] Wrong password - decryption failed')
+    } else {
+      console.error('[KEY STORAGE] Failed to retrieve private key:', error)
+    }
     return null
   }
 }

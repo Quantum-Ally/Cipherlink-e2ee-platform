@@ -9,6 +9,10 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+  server: {
+    host: '0.0.0.0',  // Bind to all addresses (allows 127.0.0.1 and localhost)
+    port: 5173,
+  },
 })
 
 
